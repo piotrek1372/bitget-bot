@@ -118,7 +118,8 @@ class BitgetTSMBot:
         # For simplicity, we calculate the raw amount. 
         # CCXT's amount_to_precision should be used before ordering.
         raw_qty = (RISK_AMOUNT_USDT * LEVERAGE) / entry_price
-        return raw_qty
+        amount = self.exchange.amount_to_precision(SYMBOL, raw_qty)
+        return amount
 
     async def execute_trade(self, side: str, amount: float, sl_price: Optional[float] = None) -> None:
         """
