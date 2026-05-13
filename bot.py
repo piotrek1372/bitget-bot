@@ -19,10 +19,10 @@ API_SECRET = os.getenv("BITGET_API_SECRET")
 API_PASSPHRASE = os.getenv("BITGET_API_PASSPHRASE")
 
 SYMBOL = os.getenv("SYMBOL", "SUI/USDT:USDT")
-TIMEFRAME = os.getenv("TIMEFRAME", "15m")
-LEVERAGE = int(os.getenv("LEVERAGE", "5"))
-RISK_AMOUNT_USDT = float(os.getenv("RISK_AMOUNT_USDT", "5"))  # Margin per trade
-DRY_RUN = os.getenv("DRY_RUN", "True").lower() == "true"
+TIMEFRAME = os.getenv("TIMEFRAME")
+LEVERAGE = int(os.getenv("LEVERAGE"))
+RISK_AMOUNT_USDT = float(os.getenv("RISK_AMOUNT_USDT"))  # Margin per trade
+DRY_RUN = os.getenv("DRY_RUN")
 
 # --- LOGGING SETUP ---
 logging.basicConfig(
