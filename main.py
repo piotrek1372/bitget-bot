@@ -65,10 +65,26 @@ class BitgetTSMBot:
         self.exchange = ccxt.bitget(config)
         self.is_running = True
 
+    async def log_ip(self) -> None:
+        """Logs the current outbound IP address used by the bot."""
+        import aiohttp
+        try:
+            # We use the same proxy settings as ccxt
+            proxy = self.exchange.proxies.get("http") if self.exchange.proxies else None
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://api.ipify.org?format=json", proxy=proxy) as response:
+                    data = await response.json()
+                    logger.info(f"Bot outbound IP (via proxy): {data.get('ip')}")
+        except Exception as e:
+            logger.warning(f"Could not determine outbound IP: {e}")
+
     async def initialize(self) -> None:
         """Initializes exchange settings like margin mode and leverage."""
         try:
-            # Set to isolated margin mode as required
+            # 0. Log outbound IP
+            await self.log_ip()
+
+            # 1. Set to isolated margin mode as required
             logger.info(f"Setting margin mode to ISOLATED for {SYMBOL}")
             try:
                 await self.exchange.set_margin_mode("isolated", SYMBOL)
