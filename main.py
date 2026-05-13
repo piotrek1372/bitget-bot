@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIGURATION ---
+proxy_url = os.environ.get("FIXIE_URL")
 API_KEY = os.getenv("BITGET_API_KEY")
 API_SECRET = os.getenv("BITGET_API_SECRET")
 API_PASSPHRASE = os.getenv("BITGET_API_PASSPHRASE")
@@ -44,13 +45,24 @@ class BitgetTSMBot:
     """
 
     def __init__(self) -> None:
-        self.exchange = ccxt.bitget({
+        config = {
             "apiKey": API_KEY,
             "secret": API_SECRET,
             "password": API_PASSPHRASE,
             "enableRateLimit": True,
             "options": {"defaultType": "swap"},
-        })
+        }
+
+        # Handle Proxy for Heroku (Fixie)
+        if proxy_url:
+            p_url = proxy_url if proxy_url.startswith("http") else f"http://{proxy_url}"
+            config["proxies"] = {
+                "http": p_url,
+                "https": p_url,
+            }
+            logger.info(f"Proxy configured using: {p_url}")
+
+        self.exchange = ccxt.bitget(config)
         self.is_running = True
 
     async def initialize(self) -> None:
