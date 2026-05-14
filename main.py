@@ -246,7 +246,11 @@ class BitgetTSMBot:
                         await self.close_position(pos)
             else:
                 # We are NOT IN_POSITION
+<<<<<<< HEAD
                 # Long Entry: Close > EMA_50 AND RSI_14 < 40
+=======
+                # Long Entry: Close > EMA_50 AND RSI_14 < 30
+>>>>>>> d4a2981c0e7ae35d54a41f7d4d854fc1308cfade
                 if curr_close > ema_50 and rsi_14 < 40:
                     amount = self.calculate_quantity(curr_close)
                     sl_price = curr_close - (2 * atr_14)
@@ -255,7 +259,11 @@ class BitgetTSMBot:
                     await self.execute_trade("buy", amount, sl_price, tp_price)
                 
                 # Short Entry: Close < EMA_50 AND RSI_14 > 60
+<<<<<<< HEAD
                 elif curr_close < ema_50 and rsi_14 > 60:
+=======
+                elif curr_close < ema_50 and rsi_14 > 70:
+>>>>>>> d4a2981c0e7ae35d54a41f7d4d854fc1308cfade
                     amount = self.calculate_quantity(curr_close)
                     sl_price = curr_close + (2 * atr_14)
                     tp_price = curr_close - (4 * atr_14)
