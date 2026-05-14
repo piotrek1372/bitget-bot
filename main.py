@@ -31,8 +31,7 @@ def main() -> None:
     # 2. Inicjalizacja Loggera (sys.stdout dla Heroku Logplex)
     logger_service = HerokuLogger()
     
-        # 3. Kontener Dependency Injection (Wstrzykiwanie zależności)
-    # Zastosowanie keyword arguments chroni przed błędami kolejności parametrów
+            # 3. Kontener Dependency Injection (Wstrzykiwanie zależności)
     
     exchange = BitgetExchange(config=config, logger=logger_service)
     
@@ -44,12 +43,11 @@ def main() -> None:
     
     state_manager = StateManager(config=config, logger=logger_service, exchange=exchange)
     
-   execution_manager = ExecutionManager(
-    logger=logger_service, 
-    exchange=exchange, 
-    state_manager=state_manager
-)
-
+    execution_manager = ExecutionManager(
+        logger=logger_service, 
+        exchange=exchange, 
+        state_manager=state_manager
+    )
     
     # 4. Inicjalizacja głównego Orkiestratora
     bot = FortressBot(
