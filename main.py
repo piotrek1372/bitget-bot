@@ -31,13 +31,25 @@ def main() -> None:
     # 2. Inicjalizacja Loggera (sys.stdout dla Heroku Logplex)
     logger_service = HerokuLogger()
     
-    # 3. Kontener Dependency Injection (Wstrzykiwanie zależności)
-    exchange = BitgetExchange(config, logger_service)
-    market_data = MarketDataService(config, exchange)
-    strategy = StrategyEngine(config)
-    risk_manager = RiskManager(config)
-    state_manager = StateManager(config, exchange)
-    execution_manager = ExecutionManager(config, exchange, state_manager)
+        # 3. Kontener Dependency Injection (Wstrzykiwanie zależności)
+    # Zastosowanie keyword arguments chroni przed błędami kolejności parametrów
+    
+    exchange = BitgetExchange(config=config, logger=logger_service)
+    
+    market_data = MarketDataService(config=config, logger=logger_service, exchange=exchange)
+    
+    strategy = StrategyEngine(config=config, logger=logger_service)
+    
+    risk_manager = RiskManager(config=config, logger=logger_service)
+    
+    state_manager = StateManager(config=config, logger=logger_service, exchange=exchange)
+    
+    execution_manager = ExecutionManager(
+        config=config, 
+        logger=logger_service, 
+        exchange=exchange, 
+        state_manager=state_manager
+    )
     
     # 4. Inicjalizacja głównego Orkiestratora
     bot = FortressBot(
@@ -50,6 +62,7 @@ def main() -> None:
         execution_manager=execution_manager,
         state_manager=state_manager
     )
+
 
     loop = asyncio.get_event_loop()
     
