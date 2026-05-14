@@ -66,7 +66,7 @@ class MarketDataService(IMarketData):
             msg = await self._sync_queue.get()
             self._process_tick(msg)
 
-    async def _ws_loop(self) -> None:
+    async def listen_websocket(self) -> None:
         """Main WebSocket listener loop."""
         while self._is_running:
             try:
