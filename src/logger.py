@@ -1,74 +1,55 @@
-import json
 import logging
-import logging.handlers
+import sys
 import queue
-from typing import Any, Dict, Optional
-from datetime import datetime
-from .interfaces import ILogger
+from logging.handlers import QueueHandler, QueueListener
+from typing import Any
 
-class JsonFormatter(logging.Formatter):
-    """Formats log records as JSON strings for structured logging."""
-    def format(self, record: logging.LogRecord) -> str:
-        log_record = {
-            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
-            "level": record.levelname,
-            "message": record.getMessage(),
-            "module": record.module,
-            "func": record.funcName,
-        }
-        
-        # Merge extra fields if they exist
-        if hasattr(record, "extra_data") and isinstance(record.extra_data, dict):
-            log_record.update(record.extra_data)
-            
-        return json.dumps(log_record)
+# Jeśli masz zdefiniowany ILogger w src.interfaces, odkomentuj poniższą linię:
+# from .interfaces import ILogger
+# Jeśli nie, klasa HerokuLogger nie musi po nim jawnie dziedziczyć w Pythonie (tzw. Duck Typing).
 
-class CustomLogger(ILogger):
+class HerokuLogger:
     """
-    Non-blocking structured JSON logger.
-    Uses QueueHandler + QueueListener to offload I/O to a background thread,
-    ensuring the asyncio event loop is never blocked by disk/console writes.
+    Logger dedykowany dla środowiska Heroku (12-Factor App).
+    Wypisuje logi asynchronicznie na sys.stdout w formacie JSON, 
+    aby nie blokować głównej pętli asyncio.
     """
-    def __init__(self, name: str = "FortressBot", log_file: str = "bot.log") -> None:
+    
+    def __init__(self, name: str = "FortressBot") -> None:
         self._logger = logging.getLogger(name)
         self._logger.setLevel(logging.INFO)
         
-        # 1. Create a thread-safe queue for log records
-        self._log_queue: queue.Queue = queue.Queue(-1)  # Unlimited size
+        # Kolejka bez limitu wielkości
+        self._log_queue = queue.Queue(-1)
         
-        # 2. Setup the internal handler that just puts items into the queue (Non-blocking)
-        queue_handler = logging.handlers.QueueHandler(self._log_queue)
+        # Handler wkładający logi do kolejki (nieblokujący)
+        queue_handler = QueueHandler(self._log_queue)
         self._logger.addHandler(queue_handler)
         
-        # 3. Setup the real handlers (Console & File) that will run in the Listener thread
-        console_handler = logging.StreamHandler()
-        file_handler = logging.FileHandler(log_file)
+        # Zapis wyłącznie na standardowe wyjście (wymóg Heroku)
+        console_handler = logging.StreamHandler(sys.stdout)
         
-        formatter = JsonFormatter()
-        console_handler.setFormatter(formatter)
-        file_handler.setFormatter(formatter)
-        
-        # 4. Start the Listener in a separate background thread
-        self._listener = logging.handlers.QueueListener(
-            self._log_queue, 
-            console_handler, 
-            file_handler, 
-            respect_handler_level=True
+        # Formatowanie JSON ułatwia analizę w zewnętrznych narzędziach podpiętych pod Heroku
+        formatter = logging.Formatter(
+            '{"time": "%(asctime)s", "level": "%(levelname)s", "msg": "%(message)s"}'
         )
+        console_handler.setFormatter(formatter)
+        
+        # Listener działający w wątku w tle
+        self._listener = QueueListener(self._log_queue, console_handler)
         self._listener.start()
 
-    def info(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        self._logger.info(message, extra={"extra_data": extra} if extra else None)
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._logger.info(msg, *args, **kwargs)
 
-    def error(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        self._logger.error(message, extra={"extra_data": extra} if extra else None)
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._logger.warning(msg, *args, **kwargs)
 
-    def warning(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        self._logger.warning(message, extra={"extra_data": extra} if extra else None)
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._logger.error(msg, *args, **kwargs)
 
-    def critical(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        self._logger.critical(message, extra={"extra_data": extra} if extra else None)
-
-    def stop(self) -> None:
-        """Stops the background listener thread."""
-        self._listener.stop()
+    def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._logger.critical(msg, *args, **kwargs)
+        
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._logger.debug(msg, *args, **kwargs)
