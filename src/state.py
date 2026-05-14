@@ -88,7 +88,7 @@ class StateManager(IStateManager):
             self._logger.warning(f"Watchdog Triggered: WS update for order {order_id} timed out. Reconciling via REST...")
             await self._reconcile_state()
 
-    async def _ws_loop(self) -> None:
+    async def listen_user_data(self) -> None:
         """Listens for User Data updates (Positions/Orders)."""
         while self._is_running:
             try:
