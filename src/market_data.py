@@ -134,3 +134,8 @@ class MarketDataService(IMarketData):
         if self._ws_task:
             self._ws_task.cancel()
         await self._ws_client.close()
+
+        def set_candle_event(self, event: asyncio.Event) -> None:
+        """Ustawia zdarzenie (trigger) wyzwalane po zamknięciu nowej świecy."""
+        self._new_candle_event = event
+
