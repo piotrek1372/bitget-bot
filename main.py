@@ -38,10 +38,11 @@ class BitgetTSMBot:
     A production-ready trading bot for Bitget Futures implementing the TSM strategy.
     
     Strategy: Trend-Support-Momentum (TSM)
-    - Long: Close > EMA_50 AND RSI_14 < 30
-    - Short: Close < EMA_50 AND RSI_14 > 70
-    - Exit Long: Close >= EMA_50
-    - Exit Short: Close <= EMA_50
+    - Long: Close > EMA_50 AND RSI_14 < 40
+    - Short: Close < EMA_50 AND RSI_14 > 60
+    - Stop Loss: 2 * ATR_14
+    - Take Profit: 4 * ATR_14
+    - Exit: Trend reversal (EMA cross) or TP/SL hit
     """
 
     def __init__(self) -> None:
@@ -149,9 +150,15 @@ class BitgetTSMBot:
         amount = self.exchange.amount_to_precision(SYMBOL, raw_qty)
         return amount
 
-    async def execute_trade(self, side: str, amount: float, sl_price: Optional[float] = None) -> None:
+    async def execute_trade(
+        self, 
+        side: str, 
+        amount: float, 
+        sl_price: Optional[float] = None,
+        tp_price: Optional[float] = None
+    ) -> None:
         """
-        Executes a market order and sets a stop loss.
+        Executes a market order and sets stop loss and take profit trigger orders.
         """
         if DRY_RUN:
             logger.info(f"[DRY RUN] Would execute {side} market order for {amount} {SYMBOL}")
@@ -162,15 +169,22 @@ class BitgetTSMBot:
             order = await self.exchange.create_market_order(SYMBOL, side, amount)
             logger.info(f"Entry {side} executed: {order['id']}")
 
-            # 2. Set Stop Loss if provided
+            # 2. Set Stop Loss / Take Profit (Trigger Orders)
+            exit_side = "sell" if side == "buy" else "buy"
+            
             if sl_price:
-                sl_side = "sell" if side == "buy" else "buy"
                 params = {"stopPrice": sl_price, "reduceOnly": True}
-                # Using 'conditional' or 'trigger' order for SL
                 sl_order = await self.exchange.create_order(
-                    SYMBOL, "market", sl_side, amount, None, params
+                    SYMBOL, "market", exit_side, amount, None, params
                 )
                 logger.info(f"Stop Loss set at {sl_price}: {sl_order['id']}")
+
+            if tp_price:
+                params = {"stopPrice": tp_price, "reduceOnly": True}
+                tp_order = await self.exchange.create_order(
+                    SYMBOL, "market", exit_side, amount, None, params
+                )
+                logger.info(f"Take Profit set at {tp_price}: {tp_order['id']}")
 
         except ccxt.InsufficientFunds as e:
             logger.error(f"Insufficient funds: {e}")
@@ -223,28 +237,30 @@ class BitgetTSMBot:
                 side = pos["side"] # 'long' or 'short'
                 
                 if side == "long":
-                    if curr_close >= ema_50:
-                        logger.info("Exit Signal: Long (Close >= EMA_50)")
+                    if curr_close < ema_50:
+                        logger.info("Exit Signal: Long (Close < EMA_50)")
                         await self.close_position(pos)
                 elif side == "short":
-                    if curr_close <= ema_50:
-                        logger.info("Exit Signal: Short (Close <= EMA_50)")
+                    if curr_close > ema_50:
+                        logger.info("Exit Signal: Short (Close > EMA_50)")
                         await self.close_position(pos)
             else:
                 # We are NOT IN_POSITION
-                # Long Entry: Close > EMA_50 AND RSI_14 < 30
-                if curr_close > ema_50 and rsi_14 < 30:
+                # Long Entry: Close > EMA_50 AND RSI_14 < 40
+                if curr_close > ema_50 and rsi_14 < 40:
                     amount = self.calculate_quantity(curr_close)
                     sl_price = curr_close - (2 * atr_14)
-                    logger.info(f"Entry Signal: LONG | SL: {sl_price:.4f}")
-                    await self.execute_trade("buy", amount, sl_price)
+                    tp_price = curr_close + (4 * atr_14)
+                    logger.info(f"Entry Signal: LONG | SL: {sl_price:.4f} | TP: {tp_price:.4f}")
+                    await self.execute_trade("buy", amount, sl_price, tp_price)
                 
-                # Short Entry: Close < EMA_50 AND RSI_14 > 70
-                elif curr_close < ema_50 and rsi_14 > 70:
+                # Short Entry: Close < EMA_50 AND RSI_14 > 60
+                elif curr_close < ema_50 and rsi_14 > 60:
                     amount = self.calculate_quantity(curr_close)
                     sl_price = curr_close + (2 * atr_14)
-                    logger.info(f"Entry Signal: SHORT | SL: {sl_price:.4f}")
-                    await self.execute_trade("sell", amount, sl_price)
+                    tp_price = curr_close - (4 * atr_14)
+                    logger.info(f"Entry Signal: SHORT | SL: {sl_price:.4f} | TP: {tp_price:.4f}")
+                    await self.execute_trade("sell", amount, sl_price, tp_price)
 
         except (ccxt.NetworkError, ccxt.ExchangeError) as e:
             logger.warning(f"Exchange error: {e}")
