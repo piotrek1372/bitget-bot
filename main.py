@@ -44,12 +44,12 @@ def main() -> None:
     
     state_manager = StateManager(config=config, logger=logger_service, exchange=exchange)
     
-    execution_manager = ExecutionManager(
-        config=config, 
-        logger=logger_service, 
-        exchange=exchange, 
-        state_manager=state_manager
-    )
+   execution_manager = ExecutionManager(
+    logger=logger_service, 
+    exchange=exchange, 
+    state_manager=state_manager
+)
+
     
     # 4. Inicjalizacja głównego Orkiestratora
     bot = FortressBot(
