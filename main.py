@@ -233,13 +233,13 @@ class BitgetTSMBot:
             else:
                 # We are NOT IN_POSITION
                 # Long Entry: Close > EMA_50 AND RSI_14 < 30
-                if curr_close > ema_50 and rsi_14 < 30:
+                if curr_close > ema_50 and rsi_14 < 40:
                     amount = self.calculate_quantity(curr_close)
                     sl_price = curr_close - (2 * atr_14)
                     logger.info(f"Entry Signal: LONG | SL: {sl_price:.4f}")
                     await self.execute_trade("buy", amount, sl_price)
                 
-                # Short Entry: Close < EMA_50 AND RSI_14 > 70
+                # Short Entry: Close < EMA_50 AND RSI_14 > 60
                 elif curr_close < ema_50 and rsi_14 > 70:
                     amount = self.calculate_quantity(curr_close)
                     sl_price = curr_close + (2 * atr_14)
