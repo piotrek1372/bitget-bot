@@ -1,76 +1,67 @@
+# main.py
 import asyncio
+import signal
 import sys
+
 from src.config import AppConfig
-from src.logger import CustomLogger
+from src.logger import HerokuLogger
 from src.exchange import BitgetExchange
 from src.market_data import MarketDataService
 from src.strategy import StrategyEngine
 from src.risk import RiskManager
 from src.execution import ExecutionManager
 from src.state import StateManager
-from src.bot import FortressBot, setup_signal_handlers
+from src.bot import FortressBot
 
-async def main():
-    """
-    Application Entry Point.
-    Implements Dependency Injection (DI) manually to orchestrate the Fortress system.
-    """
-    # 1. Initialize Configuration (Fail-fast validation)
+async def shutdown_sequence(loop: asyncio.AbstractEventLoop) -> None:
+    """Obsługa SIGTERM/SIGINT z Heroku (limit 30 sekund)."""
+    print("Otrzymano sygnał SIGTERM. Rozpoczynam Graceful Shutdown...", flush=True)
+    
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    
+    await asyncio.gather(*tasks, return_exceptions=True)
+    loop.stop()
+
+def main() -> None:
+    # 1. Inicjalizacja konfiguracji (Fail-fast przy braku zmiennych .env)
+    config = AppConfig()
+    
+    # 2. Inicjalizacja Loggera (sys.stdout dla Heroku Logplex)
+    logger_service = HerokuLogger()
+    
+    # 3. Kontener Dependency Injection (Wstrzykiwanie zależności)
+    exchange = BitgetExchange(config)
+    market_data = MarketDataService(config, exchange)
+    strategy = StrategyEngine(config)
+    risk_manager = RiskManager(config)
+    state_manager = StateManager(config, exchange)
+    execution_manager = ExecutionManager(config, exchange, state_manager)
+    
+    # 4. Inicjalizacja głównego Orkiestratora
+    bot = FortressBot(
+        config=config,
+        logger=logger_service,
+        exchange=exchange,
+        market_data=market_data,
+        strategy=strategy,
+        risk_manager=risk_manager,
+        execution_manager=execution_manager,
+        state_manager=state_manager
+    )
+
+    loop = asyncio.get_event_loop()
+    
+    # Rejestracja handlerów dla sygnałów systemowych (nie działa natywnie na Windowsie)
+    if sys.platform != "win32":
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown_sequence(loop)))
+
     try:
-        config = AppConfig()
-    except Exception as e:
-        print(f"CRITICAL: Configuration error - {e}")
-        sys.exit(1)
-
-    # 2. Initialize Core Logger (Non-blocking JSON)
-    logger = CustomLogger(name="FortressBot", log_file="fortress.log")
-    logger.info("Fortress Architecture: Booting System...")
-
-    try:
-        # 3. Initialize Exchange Interface (REST)
-        exchange = BitgetExchange(config, logger)
-
-        # 4. Initialize State Manager (User Data Stream)
-        state_manager = StateManager(config, logger, exchange)
-
-        # 5. Initialize Market Data Service (K-line Stream)
-        market_data = MarketDataService(config, logger, exchange)
-
-        # 6. Initialize Strategy Engine (Pure Logic)
-        strategy = StrategyEngine(config, logger)
-
-        # 7. Initialize Risk Manager (Capital Guard)
-        risk_manager = RiskManager(config, logger)
-
-        # 8. Initialize Execution Manager (Muscle)
-        execution = ExecutionManager(exchange, logger, state_manager)
-
-        # 9. Inject dependencies into the Orchestrator
-        bot = FortressBot(
-            config=config,
-            logger=logger,
-            exchange=exchange,
-            market_data=market_data,
-            strategy=strategy,
-            risk=risk_manager,
-            execution=execution,
-            state=state_manager
-        )
-
-        # 10. Setup OS Signal Handlers (Graceful Shutdown)
-        loop = asyncio.get_running_loop()
-        setup_signal_handlers(bot, loop)
-
-        # 11. Run the Engine
-        await bot.run()
-
-    except Exception as e:
-        logger.critical(f"Unhandled Boot Exception: {e}")
+        loop.run_until_complete(bot.run())
     finally:
-        logger.info("System process terminated.")
+        loop.close()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+    main()
