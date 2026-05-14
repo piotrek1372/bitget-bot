@@ -32,7 +32,7 @@ def main() -> None:
     logger_service = HerokuLogger()
     
     # 3. Kontener Dependency Injection (Wstrzykiwanie zależności)
-    exchange = BitgetExchange(config)
+    exchange = BitgetExchange(config, logger_service)
     market_data = MarketDataService(config, exchange)
     strategy = StrategyEngine(config)
     risk_manager = RiskManager(config)
